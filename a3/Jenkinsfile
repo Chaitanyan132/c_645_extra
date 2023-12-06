@@ -1,0 +1,50 @@
+// This is the Jenkins file of the project which will be used to build the CI/CD pipeline.
+
+pipeline {
+    
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub')
+    }
+    agent any
+    tools {
+     maven 'Maven 3.9.4'
+    }
+    stages {
+        stage('Maven Clean') {
+            steps {
+               script{
+                sh 'mvn clean install -DskipTests'
+               }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'rm -rf *.var'
+                sh 'jar -cvf Survey-0.0.1-SNAPSHOT.jar -C "src/main" .'     
+                sh 'docker build -t sagar21999/swe645assignment3:latest .'
+            }
+        }
+        stage('Login') {
+            steps {
+                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+            }
+        }
+        stage("Push image to docker hub") {
+            steps {
+                sh 'docker push sagar21999/swe645assignment3:latest'
+            }
+        }
+        stage("deploying on k8") {
+            steps {
+                sh 'kubectl set image deployment/deploy1 container-0=sagar21999/swe645assignment3:latest -n default'
+                sh 'kubectl rollout restart deploy deploy1 -n default'
+            }
+        }
+    }
+    post {
+        always {
+            sh 'docker logout'
+        }
+    }
+}
